@@ -31,7 +31,6 @@ def tokenize_string(s):
 
 def generate(model, itos, stoi, block_size, input_string, max_len=50):
     input_string = input_string[-block_size:]
-    # If the input string is less than block_size, pad it with '.'
     input_string = '.' * (block_size - len(input_string)) + input_string if len(input_string) < block_size else input_string
     context = tokenize_string(input_string)
     name = ''
@@ -40,24 +39,27 @@ def generate(model, itos, stoi, block_size, input_string, max_len=50):
         y_pred = model(x)
         ix = torch.distributions.categorical.Categorical(logits=y_pred).sample().item()
         ch = itos[ix]
-        if ch == '.':
-            break
         name += ch
         context = context[1:] + [ix]
     return name
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps')
-emb_dim = 64
-  
-model = NextChar(20, len(stoi), emb_dim, 100).to(device)
-model.load_state_dict(torch.load('model.pth'))
 
 st.title('Shakespear Text Generator')
-
+st.markdown("---")
 input_string = st.text_input('Enter the starting string', 'Thou shant not')
 output_len = st.slider('Output length', 10, 200, 50)
+st.markdown("---")
+emb_dim = st.selectbox('Embedding dimension', [4, 16, 32, 64, 128])
+context_length = st.selectbox('Context length', [1, 5, 10, 20, 50])
+random_state = st.slider('Random Seed', 1, 5, 3)
+st.markdown("---")
+
 
 if st.button('Generate'):
-    output = generate(model, itos, stoi, 20, input_string, output_len)
-    st.write(output)
+    model = NextChar(context_length, len(stoi), emb_dim, 100).to(device)
+    model.load_state_dict(torch.load(f'models/model_{context_length}_{emb_dim}_{42*(10**(random_state-1))}.pth'))
+    output = generate(model, itos, stoi, context_length, input_string, output_len)
+    st.write('Generated Text: ')
+    st.markdown(f'<span style="color: green; display: inline;">{input_string}<span style="display: inline; color: white;">{output}</span></span>', unsafe_allow_html=True)
